@@ -1,0 +1,13 @@
+# Per-project artifact output from the vs-core-* pipeline.
+# Skills generate these into consuming projects; they do not belong in this repo.
+.spec/
+
+# Temporary prompt assembly output (build-prompt.sh --tmp produces /tmp files;
+# this line covers accidental redirect into the repo root).
+*.tmp.md
+
+# Editor / OS debris.
+.DS_Store
+*~
+.idea/
+.vscode/
