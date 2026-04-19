@@ -289,7 +289,7 @@ On approval:
 
 1. **Init mode**: write `<path>/CLAUDE.md`. Overwrite only if the user explicitly acknowledged an existing file at Phase 0.
 2. **Append mode**: read existing CLAUDE.md, insert the approved addition at the correct location (see insertion algorithm below), write back.
-3. Run `bash ~/.claude/skills/vs-core-tropes/check-unicode.sh <path>`. If issues, run `fix-unicode.sh` and re-verify.
+3. Invoke the unicode check from vs-core-tropes: run `bash <tropes-skill-dir>/check-unicode.sh <path>`. The `<tropes-skill-dir>` placeholder resolves to wherever vs-core-tropes lives on this system; for Claude Code's default layout that is `~/.claude/skills/vs-core-tropes`. If issues, run the sibling `fix-unicode.sh` and re-verify.
 4. **Structural spot checks** on the written file:
    - No duplicate H2 headings.
    - No empty sections (Notes excepted).
