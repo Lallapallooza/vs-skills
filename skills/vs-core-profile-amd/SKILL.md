@@ -7,6 +7,15 @@ description: CPU profiling on AMD Zen processors, uProf-centric with perf/samply
 
 Operational guide for profiling native code on AMD Zen 2/3/4/5 processors. Covers AMD uProf (CLI + PCM + timechart), Linux `perf` with AMD-specific events (IBS), `likwid` with Zen event groups, and `bpftrace`/`samply`/`hotspot` as ecosystem complements. References in this skill are Zen-generation-aware — ignoring the generation gives silently wrong results.
 
+## Core principle: match tool specialization to the question
+
+Prefer the most specialized tool for the specific question, not the most general one. On AMD this splits two ways:
+
+- **AMD-specific microarch** (TMA on Zen 4+, IBS Op/Fetch with AMD filters like `L3MissOnly` / `LdLat`, per-UMC memory bandwidth, roofline, per-core power/thermal timechart) → **AMD uProf / AMDuProfPcm**. No perf-based workflow gives equivalent pre-curated output; this is where uProf earns its install. If it's available, use it for these questions.
+- **Everything else** — generic hotspot hunting, cgroup-scoped profiles, off-CPU / blocked time, false sharing (`perf c2c`), HPC region markers, sharing profiles with teammates — → **perf / samply / bpftrace / likwid**. "On AMD hardware" does NOT automatically mean "use the AMD-branded tool." For a pure hotspot hunt, `perf record` + `samply` is lower friction and teammates don't need uProf installed to open the result.
+
+The decision table below encodes this pairing. When in doubt, pick the tool whose specialization matches the question's specialization — reach for uProf *because* the question is AMD-microarch-specific, not because the CPU is AMD.
+
 ## When to use this skill
 
 Invoke on any profiling task where the target hardware is AMD (Ryzen or EPYC). Specifically:
