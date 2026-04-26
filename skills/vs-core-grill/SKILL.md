@@ -28,7 +28,7 @@ Interview the user relentlessly about every aspect of this plan until you reach 
 
 ## Artifact Flow
 
-1. **Before the interview begins**: Run ARTIFACT_DISCOVERY (see artifact-persistence.md). Establish the feature slug silently if unambiguous.
+1. **Before the interview begins**: Run ARTIFACT_DISCOVERY (see artifact-persistence.md). Establish the feature slug silently if unambiguous. If `.spec/{slug}/mission.md` exists, read it; skip questions whose answers are present in its Decision Log.
 2. **After producing the Shared Understanding summary**: Run WRITE_ARTIFACT -- write `grill.md` to `.spec/{slug}/` with the frontmatter schema and the Shared Understanding block as the body.
 
 ## Rules

@@ -57,7 +57,7 @@ When this skill says "dispatch" an agent, you MUST use the `--tmp` flow to keep 
 ## Artifact Flow
 
 1. **Before Phase 1**: Run ARTIFACT_DISCOVERY (see artifact-persistence.md). Establish the feature slug silently if unambiguous.
-2. **Before Phase 1**: Run UPSTREAM_CONSUMPTION for `grill`. If `grill.md` exists, read it and use the Decisions Made and Recommended Next Step to sharpen the research plan -- skip questions already resolved there.
+2. **Before Phase 1**: Run UPSTREAM_CONSUMPTION for `grill`. If `grill.md` exists, read it and use the Decisions Made and Recommended Next Step to sharpen the research plan -- skip questions already resolved there. Additionally: if `.spec/{slug}/mission.md` exists, read it; skip sub-questions whose answers are present in its Decision Log.
 3. **After Phase 6**: Run WRITE_ARTIFACT -- write `research.md` to `.spec/{slug}/` using the Phase 6 output as the body.
 
 ## Phase 1: Understand the Question (Grill)

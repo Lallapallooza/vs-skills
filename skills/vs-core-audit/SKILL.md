@@ -29,7 +29,7 @@ Read [references/evidence-standards.md](references/evidence-standards.md) for th
 ## Artifact Flow
 
 1. **Before starting**: Run ARTIFACT_DISCOVERY (see artifact-persistence.md). Establish the feature slug silently if unambiguous.
-2. **Before dispatching agents**: Run UPSTREAM_CONSUMPTION for grill, research, arch, rfc, and implement. Include any found artifacts as context for the review agents.
+2. **Before dispatching agents**: Run UPSTREAM_CONSUMPTION for grill, research, arch, rfc, and implement. Include any found artifacts as context for the review agents. Additionally: if `.spec/{slug}/mission.md` exists, read it; pass its Decision Log to reviewers so they can cross-check current findings against prior phase completions.
 3. **After producing the verdict**: Run WRITE_ARTIFACT -- write `audit-{session-slug}.md` to `.spec/{slug}/`. Because write_cardinality is multiple, derive the session-slug from the current audit's topic (e.g., `audit-auth-refactor.md`). If a file with that slug already exists, append `-2`, `-3`, etc.
 
 ## How to Dispatch Agents

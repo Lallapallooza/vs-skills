@@ -28,7 +28,7 @@ You are a debugger. Your job is to find the root cause before attempting any fix
 ## Artifact Flow
 
 1. **Before starting**: Run ARTIFACT_DISCOVERY (see artifact-persistence.md). If no feature context exists and the user indicates this is isolated work, use STANDALONE_FALLBACK -- write to `.spec/_standalone/debug-{slug}.md` instead.
-2. **Before Phase 1**: Run UPSTREAM_CONSUMPTION for implement. Include any found `implement.md` as context for understanding expected behavior.
+2. **Before Phase 1**: Run UPSTREAM_CONSUMPTION for implement. Include any found `implement.md` as context for understanding expected behavior. Additionally: if `.spec/{slug}/mission.md` exists, read its Compact-recovery checklist for known divergences and ghost diagnostics relevant to this bug.
 3. **After producing the fix and verification**: Run WRITE_ARTIFACT -- write `debug-{session-slug}.md` to `.spec/{slug}/` (or `_standalone/` if standalone). Because write_cardinality is multiple, derive the session-slug from the current bug's symptom (e.g., `debug-login-crash.md`). If a file with that slug already exists, append `-2`, `-3`, etc.
 
 ## How to Dispatch Agents

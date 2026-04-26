@@ -65,6 +65,7 @@ When this skill says "dispatch" an agent, you MUST use the `--tmp` flow to keep 
    - If `grill.md` exists, read it and use it as Phase 1 context -- you may skip or shorten the live /vs-core-grill invocation at your judgment.
    - If `research.md` exists, read it and use it as Phase 2 context -- you may skip or shorten the live /vs-core-research invocation at your judgment.
    - If either file is missing, warn: "Expected upstream artifact `{stage}.md` not found. Proceed without it?" Wait for confirmation before continuing.
+   - Additionally: if `.spec/{slug}/mission.md` exists, read it. If MISSION exists but `rfc.md` doesn't, this is a redesign loop — surface prior decisions from the Decision Log. If `rfc.md` is rewritten in Phase 5, append a `[kind=spec-revised]` Decision Log entry to MISSION.
 3. **Nested invocation rule**: When /vs-core-rfc invokes /vs-core-grill (Phase 1) or /vs-core-research (Phase 2) internally via the Skill tool, those sub-skills run their logic normally but do NOT execute their own artifact persistence protocol. They do not write `grill.md` or `research.md`. Their output feeds /vs-core-rfc directly, not the filesystem.
 4. **After Phase 5 produces the living spec**: Run WRITE_ARTIFACT -- write `rfc.md` to `.spec/{slug}/` with the frontmatter schema and the spec document as the body.
 

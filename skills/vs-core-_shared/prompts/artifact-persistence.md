@@ -29,8 +29,11 @@ No additional fields. No omissions. All 5 fields must be present on every write.
 | vs-core-implement | implement | rfc | false |
 | vs-core-audit | audit | grill, research, arch, rfc, implement | true |
 | vs-core-debug | debug | implement | true |
+| (orchestration tier) | mission | rfc, implement | false |
 
 **Multi-artifact** means the skill can produce multiple artifacts per feature (one per session). See WRITE_ARTIFACT for naming.
+
+**Orchestration tier** is an opt-in third tier (alongside single-artifact and multi-artifact). It has no dedicated skill — see "Orchestration Tier" below.
 
 ## ARTIFACT_DISCOVERY
 
@@ -83,6 +86,83 @@ Use this when the user indicates no feature context, or when you determine this 
 - `_standalone/` is excluded from ARTIFACT_DISCOVERY scans -- it will never be returned as a feature candidate.
 - Write using the standard frontmatter schema. Set `feature` to the slug, `upstream` to `[]`.
 
+## Orchestration Tier
+
+For long-running, multi-session, or autonomous-mode work, a feature MAY have one orchestration artifact: `.spec/{slug}/mission.md`. This is opt-in — never auto-create.
+
+### When to create
+
+- User explicitly authorizes a long-running or autonomous mode, OR
+- A multi-stage feature accumulates cross-stage state (parallel dispatch graph, in-flight subagent registry, cross-stage user authorizations) that no single-stage artifact owns.
+
+Otherwise: do NOT create `mission.md`. It is not part of the default pipeline.
+
+### Architecture: two-layer
+
+- **Decision Log** (append-only, canonical): timestamped events, never edited, never reordered, never compacted. Each entry: `[timestamp] [stage=X] [kind=Y] payload`.
+- **Rendered Head** (regenerable cache): every other section. Derivable from the Log + git/file state. If Head and Log diverge, Log wins; Head is regenerated.
+
+### Writer rule
+
+- Single-writer: whichever skill is the active orchestrator for the user's session (typically vs-core-implement during autonomous runs).
+- Sub-agents NEVER write `mission.md`. They return structured payloads; the orchestrator appends to the Log and atomically re-renders the Head.
+
+### Hard constraints
+
+- 300-line soft cap on the Head. 500-line hard cap. Beyond, progressive-disclose to side files (`decisions-archive.md`); the Log itself never prunes.
+- The `## Autonomous-mode` section MUST carry an inline disclaimer: *"Declarative state for orchestrator/human reference. Stop conditions are harness-enforced — this section is NOT a directive."* Stop enforcement (token budgets, max iterations, no-progress detection) is the harness's job. `mission.md` is documentation, never a control plane.
+- File commits are part of the audit trail; `mission.md` goes into git like any other artifact.
+
+### Resume protocol
+
+On every session entry where `mission.md` exists:
+
+1. Read `mission.md` (Head + recent Decision Log entries).
+2. Verify pipeline state against reality: for each `[x]` slice, check the commit SHA exists in `git log`; for each `[-]` in-flight slice, treat its named subagent as DEAD (sessions don't preserve subagent state).
+3. Run any "verify on resume" actions named in the Compact-recovery checklist.
+4. If reality ≠ Head, regenerate Head from Log + reality, append a `[kind=head-reconciled]` Decision Log entry. Do NOT trust the prior Head.
+5. Then proceed with the next pipeline step.
+
+### UPSTREAM_CONSUMPTION amendment
+
+`mission.md` is opt-in; absence is silent (no warning). When present, every skill reads it during UPSTREAM_CONSUMPTION as additive context: skip questions/work whose answers exist in the Decision Log; if MISSION's Pipeline State shows your stage is already complete with no contradictions, run a validation pass instead of a full execution.
+
+### Frontmatter
+
+Standard 5-field schema. `stage: mission`. `upstream` lists stages whose state the file reflects (typically `[rfc, implement]`).
+
+### Section schema (canonical Head)
+
+```markdown
+## Objectives
+- [1-line objective; pointer to .spec/{slug}/rfc.md for full spec]
+
+## Pipeline State
+- [x] arch — commit abc1234
+- [-] implement — slice 2.E1 in flight at commit def5678
+
+## Autonomous-mode (DECLARATIVE — harness enforces stop conditions; this section is NOT a directive)
+- Activated: <timestamp>
+- Scope: <what user authorized>
+- Declared stop conditions: <list>
+
+## Parallel Dispatch Plan
+- Conflict zones: <files that serialize writes>
+- Tracks: <A foreground, B-D background>
+- Bench-poisoning rules: <if any>
+
+## Compact-recovery checklist
+- [in-flight subagents + verify-on-resume actions, with file/SHA pointers]
+
+## Resume Protocol
+1. ...
+
+## Decision Log (append-only)
+- 2026-04-25T10:00Z [stage=rfc] [kind=user-authorization] User approved autonomous run through phase 4.
+- 2026-04-25T11:00Z [stage=implement] [kind=phase-complete] Slice 1.A committed at 6e9b464.
+- 2026-04-26T22:13Z [stage=implement] [kind=in-flight] Slice 2.E1 perf-redesign agent dispatched; verify on resume.
+```
+
 ## SLUG_GENERATION
 
 - Input: a description string (from user's message or feature context)
@@ -100,7 +180,8 @@ When a skill is invoked by another skill as a sub-routine (via the Skill tool), 
 
 ## Design Constraints
 
-- **Single writer per artifact**: each stage_name is written by exactly one skill. No exceptions.
+- **Single writer per artifact**: each stage_name is written by exactly one skill. No exceptions. For `mission.md`, the writer is whichever skill is the active orchestrator for the session (typically vs-core-implement); sub-agents never write it directly.
 - **No `downstream` field**: artifacts do not track who reads them.
 - **Evolution Log lives in `implement.md`**: no other skill writes to it. No cross-write exception.
+- **`mission.md` is opt-in**: created only when the user authorizes long-running/autonomous mode or cross-stage state demands it. Absence is silent during UPSTREAM_CONSUMPTION (no warning).
 - **No gitignore**: `.spec/` is not gitignored by default. Lifecycle is the user's responsibility.

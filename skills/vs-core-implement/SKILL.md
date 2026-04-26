@@ -63,9 +63,9 @@ When this skill says "dispatch" an agent, you MUST use the `--tmp` flow to keep 
 
 ## Artifact Flow
 
-1. **Before planning begins**: Run ARTIFACT_DISCOVERY (see artifact-persistence.md). Establish the feature slug silently if unambiguous. Run UPSTREAM_CONSUMPTION for `rfc.md`. If `rfc.md` is missing, warn the user: "No rfc.md found for this feature. Proceed without a spec?" and wait for their answer before continuing.
-2. **After each slice completes (PASS verdict)**: Append the slice report and any Evolution Log entries to implement.md using WRITE_ARTIFACT in overwrite mode.
-3. **After all slices complete**: Finalize implement.md with the full Implementation Plan, all Slice Reports, and the complete Evolution Log. Run WRITE_ARTIFACT in overwrite mode. Preserve `created` from the first write.
+1. **Before planning begins**: Run ARTIFACT_DISCOVERY (see artifact-persistence.md). Establish the feature slug silently if unambiguous. Run UPSTREAM_CONSUMPTION for `rfc.md`. If `rfc.md` is missing, warn the user: "No rfc.md found for this feature. Proceed without a spec?" and wait for their answer before continuing. Additionally: if `.spec/{slug}/mission.md` exists, read it. If its Pipeline State has in-flight `[-]` slices, run the Resume Protocol's verify-against-reality step before passing the plan to the planner — treat any in-flight subagent named in the Compact-recovery checklist as DEAD; its work needs re-verification by reading git/files.
+2. **After each slice completes (PASS verdict)**: Append the slice report and any Evolution Log entries to implement.md using WRITE_ARTIFACT in overwrite mode. If `mission.md` exists, append a `[kind=slice-complete]` entry to its Decision Log naming the slice and commit SHA, then regenerate the Pipeline State and Compact-recovery sections of the Head. If the slice produced benchmark numbers, append them to the Compact-recovery checklist.
+3. **After all slices complete**: Finalize implement.md with the full Implementation Plan, all Slice Reports, and the complete Evolution Log. Run WRITE_ARTIFACT in overwrite mode. Preserve `created` from the first write. If `mission.md` exists, append a `[kind=phase-complete]` Decision Log entry and regenerate the Resume Protocol section to point at the next phase or Final Status.
 
 ## Phase 1: Planning
 

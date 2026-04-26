@@ -70,7 +70,7 @@ When this skill says "dispatch" an agent, you MUST use the `--tmp` flow to keep 
 ## Artifact Flow
 
 1. **Before Intent Classification**: Run ARTIFACT_DISCOVERY (see artifact-persistence.md). Establish the feature slug silently if unambiguous.
-2. **Before Intent Classification**: Run UPSTREAM_CONSUMPTION for `grill` and `research`. Read any that exist; use their content to inform both the analysis/design framing and the requirements grill (skip questions already resolved).
+2. **Before Intent Classification**: Run UPSTREAM_CONSUMPTION for `grill` and `research`. Read any that exist; use their content to inform both the analysis/design framing and the requirements grill (skip questions already resolved). Additionally: if `.spec/{slug}/mission.md` exists, read it; if its Decision Log shows the arch phase already completed with no contradictions, run a validation pass instead of full re-analysis.
 3. **After the final output step** (Analysis Step 4 or Design Step 4): Run WRITE_ARTIFACT -- write `arch.md` to `.spec/{slug}/` using the full output as the body.
 
 ## Intent Classification
