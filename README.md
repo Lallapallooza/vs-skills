@@ -1,6 +1,6 @@
 # AI Agent Skills
 
-10 modular skills for AI coding agents. Eight run as coordinator-plus-parallel-sub-agents with adversarial critical merge; two manage standing behavioral state and the project's CLAUDE.md lifecycle. Platform-agnostic -- works with Claude Code, Codex, OpenCode, or any agent that supports sub-agent dispatch and file-based skill discovery.
+12 modular skills for AI coding agents. Eight run as coordinator-plus-parallel-sub-agents with adversarial critical merge; two manage standing behavioral state and the project's CLAUDE.md lifecycle; one is a tool-mechanics operator's guide for AMD CPU profiling; one scaffolds and operates long-running autonomous iteration loops on top of the orchestration tier. Platform-agnostic -- works with Claude Code, Codex, OpenCode, or any agent that supports sub-agent dispatch and file-based skill discovery.
 
 ## Installation
 
@@ -44,8 +44,10 @@ Model tiers (`strongest`, `strong`, `fast`) are generic; map them to your platfo
 | `/vs-core-audit` | Finished work needs adversarial review | Verdict (Pass / Fix and Resubmit / Redesign / Reject) plus prioritized findings |
 | `/vs-core-debug` | Bug with unknown root cause | Root-cause diagnosis + fix + regression test |
 | `/vs-core-tropes` | Check text for AI writing patterns | Findings with concrete rewrites |
+| `/vs-core-profile-amd` | Profile or microarch-analyze native code on AMD Zen | Tool-mechanics playbook (uProf / perf / IBS / likwid / bpftrace) with Zen-generation-aware recipes |
 | `/vs-core-interactive` | Want a standing behavioral layer for a conversational session | Loaded principles, interaction style, verification iron law, banned hedges; optional session log |
 | `/vs-core-init` | Create or extend a project's CLAUDE.md | Root `CLAUDE.md` (init mode) or a targeted appended section (append mode) |
+| `/vs-core-autoloop` | Set up a long-running autonomous iteration loop (perf tuning, eval-set tuning, lint or fuzz burndown, ELO tuning, cost reduction, etc.) | Scaffolded `.spec/<instance>/` (mission.md per the orchestration tier + queue + archive + paste-ready /loop prompt) |
 
 ## Typical Workflow
 
@@ -64,11 +66,13 @@ Not every task needs every step. A small bug fix: `/vs-core-debug`. A quick feat
 
 ## Architecture
 
-**Atomic skills** (standalone, single-purpose): `/vs-core-grill`, `/vs-core-research`, `/vs-core-arch`, `/vs-core-audit`, `/vs-core-debug`, `/vs-core-tropes`.
+**Atomic skills** (standalone, single-purpose): `/vs-core-grill`, `/vs-core-research`, `/vs-core-arch`, `/vs-core-audit`, `/vs-core-debug`, `/vs-core-tropes`, `/vs-core-profile-amd`.
 
 **Pipeline skills** (call other skills): `/vs-core-rfc` (invokes grill + research patterns), `/vs-core-implement` (invokes tropes and audit as gates).
 
 **Session-scope skills** (manage state outside the pipeline): `/vs-core-interactive` (standing behavioral layer + routing), `/vs-core-init` (CLAUDE.md lifecycle manager).
+
+**Orchestration-tier skills** (scaffold and run long-lived loops on top of `mission.md`): `/vs-core-autoloop` (scaffolder + per-iter playbook for autonomous iteration loops; orthogonal to `/loop` and `/schedule` which remain the execution drivers).
 
 ### Shared Infrastructure (`vs-core-_shared/`)
 
@@ -124,8 +128,14 @@ Systematic root-cause analysis with a reflector agent for failed fixes. 2 refere
 ### `/vs-core-tropes`
 Scans prose for AI writing patterns (em-dash addiction, negative parallelism, magic adverbs, bold-first bullets, and others) against a catalog derived from tropes.fyi. Reports clusters and repeated patterns with concrete rewrites. Ships `check-unicode.sh` / `fix-unicode.sh` helpers.
 
+### `/vs-core-profile-amd`
+Operator's guide for profiling native code (C/C++/Rust/Go) on AMD Zen 2/3/4/5 hardware. Reference-heavy: 6 references covering Zen-generation matrix, top-down microarch (TMA), Instruction-Based Sampling (IBS Op / IBS Fetch), uProf install troubleshooting, perf/samply/likwid/bpftrace complements, and Zen-event-group recipes. AMD-specific microarch questions (TMA on Zen 4+, IBS Op with `L3MissOnly`/`LdLat` filters, per-UMC memory bandwidth, roofline) → uProf; everything else (cgroup-scoped profiles, off-CPU, false sharing via `perf c2c`, sharing profiles) → perf/samply/bpftrace. The skill body teaches when to reach for which tool given the question's specialization. No sub-agent dispatch.
+
 ### `/vs-core-interactive`
 Standing behavioral layer for conversational sessions. Loads four core principles (Think Before Coding, Simplicity First, Surgical Changes, Goal-Driven Execution), an interaction-style block (direct, no sycophancy, brutal honesty over sugar-coating), a verification iron law ("no completion claims without fresh verification evidence"), and a banned-hedge-phrases list. Auto-loads `trust-boundary.md`, `rationalization-rejection.md`, `self-critique-suffix.md` from shared, plus language judgment files matching detected domain signals. Suggests structured pipeline skills when the task matches their scope. Optionally writes multi-artifact session logs to `.spec/{slug}/interactive-{session-slug}.md` at natural stopping points.
+
+### `/vs-core-autoloop`
+Scaffolds and operates generic autonomous iteration loops. Two archetypes: `optimization` (numeric objective, sacred axes, MAP-Elites-style queue + island reset, bar escalation) and `coverage` (enumerable items, signature-bucketed worklist, named human-review lanes). The skill is a scaffolder + per-iter playbook; `/loop` and `/schedule` remain the execution drivers. State lives in `mission.md` per the orchestration tier (Decision Log + regenerable Head). Four iron rules: harness owns ground truth (locks, fingerprints, verdicts); variance characterization before optimization (calibrated noise floor below the candidate effect size); render-don't-append for the Head; falsifier before iteration. Two commands: `scaffold` (writes `.spec/<instance>/` from a grill) and `run` (invoked by the execution driver each tick). Composes with `/vs-core-grill` (at scaffold), `/vs-core-research` (when the idea queue runs dry), `/vs-core-audit` (verdict gate on high-stakes keeps), and measurement-specific skills (e.g., `/vs-core-profile-amd` inside the measurement primitive).
 
 ### `/vs-core-init`
 Manages the project's root CLAUDE.md through two modes. Init mode (auto-selected when no `./CLAUDE.md` exists): silent probe across build manifests, linter configs, CI workflows, monorepo signals, existing skills, README, git branches, and project structure; three inference clusters (code-sample, process-artefact, grep-count) feed "Observed from probe:" candidates into the interview; an 8-question interview fills gaps; a self-critique pass re-scans for content the first draft missed; final draft shown to the user; post-write claim verification (paths, commands, flags, named binaries) emits non-fatal warnings. Append mode (auto-selected when `./CLAUDE.md` exists and the user has a specific learning): classify the learning, propose an insertion at the correct section, write. Always-written sections in the generated file: Overview, Build and test, Durability contract (process-artefact prohibition + temporal-markers ban), Notes, Maintenance contract. `disable-model-invocation: true` because the skill modifies files on disk.
