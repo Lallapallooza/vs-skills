@@ -1,179 +1,441 @@
 ---
 name: vs-core-autoloop
-description: Scaffold and operate autonomous iteration loops on top of the orchestration tier (`mission.md`). Use when the user wants a long-running optimization or coverage loop driven by an agent without supervision, says "autoloop", "Karpathy-style autoresearch", "scaffold a loop", "run this overnight", "iterate forever on X", or describes any target with a measurable per-iter verdict (perf, eval, latency, lint, fuzz, ELO, cost, doc, dep, alert, security/PR triage, etc.).
+description: Generate a single generic pasteable autonomous iteration loop prompt/runbook. Use when the user wants a long-running optimization, coverage, evaluation, research, cleanup, triage, game-tuning, parity, performance, latency, fuzzing, cost, documentation, dependency, alert, or security loop that can keep working without repeated human babysitting while each iteration has an explicit verdict.
 ---
 
-## Artifact Profile
+# Generic Autonomous Iteration Loop
 
-Read `../vs-core-_shared/prompts/artifact-persistence.md` for the full protocol — autoloop **operates on** the existing orchestration-tier artifact (`mission.md`) rather than owning a separate stage.
+This skill produces **one** pasteable loop prompt/runbook. It does not require a special command, split the output into variants, or prescribe delegation.
 
-- **stage_name**: autoloop
-- **artifact_filename**: mission.md (the orchestration-tier artifact; not a new file)
-- **write_cardinality**: single
-- **upstream_reads**: grill (when `scaffold` invokes `/vs-core-grill` to fill template slots; absent when run-only)
-- **body_format**: the canonical orchestration-tier Head + Decision Log per `artifact-persistence.md` § "Section schema (canonical Head)" — autoloop adds no new top-level Head sections; the per-target scoreboard is a sub-table inside Pipeline State. Decision Log entries use the autoloop kind taxonomy enumerated in [`references/directory-layout.md`](references/directory-layout.md) § "Decision Log kinds". The Head is regenerable from Log + git/file state.
+The output is a single markdown block the user can paste into a coding assistant session. If the user explicitly asks to save it, write one file only:
 
-autoloop is the **active orchestrator** for the instance's session per the artifact-persistence § "Single-writer per artifact" carve-out: mission.md's writer is whichever skill is the active orchestrator, not strictly the holder of `stage_name: mission`. To prevent two orchestrators contending for the same mission.md, autoloop's `scaffold` and `run` acquire an exclusive lock on `.spec/<slug>/mission.md` for the duration of any write; if the lock is held by a vs-core-implement autonomous run on the same slug, autoloop fails fast and the user is asked to choose one orchestrator per slug. Different slugs are independent.
+`autoloop.md`
 
-## Artifact Flow
+Do not write any additional artifacts unless the user explicitly asks.
 
-1. **`scaffold` (first invocation per instance):** Run ARTIFACT_DISCOVERY (artifact-persistence.md). The instance slug becomes the feature slug. Invoke `/vs-core-grill` to fill open template slots (target unit, measurement primitive, sacred axes, mechanism class taxonomy, revert protocol, human-in-loop policy). The grill runs under the Nested Invocation Rule — its output feeds autoloop, no `grill.md` is written.
-2. **After scaffold:** Run WRITE_ARTIFACT — write `mission.md` to `.spec/{slug}/` with the orchestration-tier section schema. Set `upstream: [grill]`. Initial Decision Log holds one `[kind=user-authorization]` entry capturing the scaffold's grill answers.
-3. **`run` (per-iter invocation by execution driver):** Read `mission.md` per the Resume Protocol in artifact-persistence.md. Verify pipeline state against reality (HEAD sha, archive/, queue/). Run the loop kernel for one iter. Append per-iter Decision Log entries (one `[kind=verdict]` row, plus `[kind=lesson]` if non-trivial). Atomically re-render the Head sections from the updated Log + git/file state.
+## Goal
 
-# Generic autonomous iteration loop
+Convert the user's goal into a generic autonomous loop with:
 
-Scaffolds an `.spec/<instance>/` artifact tree for an iteration loop and emits a paste-ready prompt the user can feed to `/loop`, `/schedule`, or any other execution driver. Orthogonal to the runner — this skill writes templates and per-iter playbooks; it does not execute iterations itself.
+- a clear objective;
+- the editable surface;
+- the protected surface;
+- setup/context reads;
+- the baseline or discovery step;
+- the per-iteration command/check;
+- result parsing;
+- keep/discard/crash handling;
+- ledger format;
+- timeout policy;
+- resume rules;
+- anti-cheat rules;
+- pause gates.
 
-The skill ships two archetypes that cover the iteration-loop space:
+The loop may run for hours or days, but each iteration must be bounded and checkable.
 
-| | `optimization` | `coverage` |
-|---|---|---|
-| **Target unit** | A point in some space (slice, configuration, item under tuning) | An enumerable item (file, op, finding, ticket) |
-| **Verdict** | Numeric objective + sacred axes | Boolean done + reason |
-| **Termination** | Bar escalation; never self-stops | Worklist drained AND no new items in N iters |
-| **Queue shape** | Quality-diversity grid + island reset | Tagged worklist with named lanes |
-| **Failure mode it avoids** | Premature convergence to a local optimum | Re-proposing already-resolved items |
+## Core Output Shape
 
-Hybrid loops compose by stacking — outer coverage walks a worklist, inner optimization runs per item. There is no single primitive that does both.
+Return exactly one artifact:
 
-## When to use this skill
+```markdown
+# autoloop
 
-- The user wants an autonomous loop that grinds on a target for hours-to-days.
-- The target has a **measurable verdict per iter** (a number, a boolean, a Pareto vector).
-- The user is willing to define a noise floor and sacred axes once at scaffold time.
-- The user has, or wants to set up, an execution driver (`/loop`, `/schedule`, cron) that will repeatedly invoke the loop.
-
-## When NOT to use this skill
-
-- The task is one-off (fix this one bug, write this one feature). Use the relevant per-task skill (`vs-core-debug`, `vs-core-implement`, etc).
-- There is no measurable verdict — the loop has nothing to gate on.
-- The work is fundamentally interactive and cannot be ratified by a renderer script.
-- The user wants the agent to *decide* what to optimize (use `vs-core-grill` or `vs-core-research` first to scope a target).
-
-## The two commands
-
-```
-/vs-core-autoloop scaffold --kind {optimization|coverage} --instance <slug>
-/vs-core-autoloop run --instance <slug>
+[single pasteable autonomous loop prompt/runbook]
 ```
 
-`scaffold` runs once per new loop; it sets up the artifact tree and emits the paste-ready prompt. `run` is what the execution driver invokes each tick; it re-renders state and prints the per-iter playbook.
+The artifact must be usable as a prompt by itself. It should not depend on hidden skill state, this conversation, or a special runtime.
 
-If invoked with no subcommand, ask the user which one they want and confirm `--kind` + `--instance`.
+## Grill Only For Missing Material Slots
 
-## The four iron rules
+If a required slot is missing and cannot be safely inferred, ask one concise question before generating the loop.
 
-These hold for every instance, both archetypes, every iter. They are the only line of defense against the failure modes that took down prior autonomous-loop projects (gaming, hallucinated tool results, stale-state confirmation loops, runaway cost).
+Required slots:
 
-1. **Harness owns ground truth; agent owns hypothesis.** Locks, fingerprints, measurement output, verdicts, scoreboards — all written by harness scripts. Hypothesis text, mechanism notes, commit messages — written by the agent. No artifact is co-authored. See [`references/harness-agent-split.md`](references/harness-agent-split.md).
+- **Goal:** what is being improved, reduced, covered, fixed, or triaged.
+- **Editable surface:** files, directories, configs, docs, tests, data, or external systems the loop may change.
+- **Protected surface:** files, commands, datasets, evaluators, benchmarks, fixtures, credentials, external systems, production resources, or generated artifacts the loop must not alter.
+- **Verdict source:** command, metric, done-check, human-review lane, or other rule that decides keep/discard.
+- **Rollback/keep policy:** how to keep successful work and abandon failed work.
 
-2. **Variance characterization before optimization.** Every measurement primitive has a noise floor. Calibrate it at scaffold time by running the primitive K times under no-change conditions and recording the dispersion. Any iter delta below `k × noise_floor` is rejected as `discard_objective` with `description=below_floor`. See [`references/noise-floor-calibration.md`](references/noise-floor-calibration.md).
+Infer conservative defaults for non-dangerous slots and show them in the output. Never infer permission to push, merge, deploy, spend money, use credentials, mutate production/external state, delete data, or edit evaluators.
 
-3. **Render-don't-append for STATE.** STATE is regenerated each iter from primary sources, never written to by the agent. If STATE disagrees with reality, the renderer reconciles on the next iter; the agent never edits STATE to "correct" it. See [`references/state-rendering.md`](references/state-rendering.md).
+## Loop Contract
 
-4. **Falsifier before iteration.** Every idea ships a `false_signal` field — the cheapest experiment that disproves the mechanism. The harness runs `false_signal` first; if it fires, the idea is rejected as `discard_falsified` without applying the change. See [`references/falsifier-registry-schema.md`](references/falsifier-registry-schema.md).
+Every generated loop must include these sections in this order:
 
-## The loop kernel (13-step sequence)
+1. **Goal**
+2. **Scope**
+3. **Protected Surface**
+4. **Setup**
+5. **Baseline**
+6. **Ledger**
+7. **Iteration**
+8. **Verdict**
+9. **Keep / Discard / Crash**
+10. **Idea Refill**
+11. **Pause Gates**
+12. **Resume**
+13. **Anti-Cheat**
 
-The same sequence runs both archetypes. Step ownership in brackets.
+Use the exact section names above.
 
+## Section Requirements
+
+### Goal
+
+State the target in one or two sentences. Include the metric, done condition, or desired state if known.
+
+Good:
+
+```markdown
+Improve `[primary_metric]` while editing only `[allowed_surface]`.
 ```
-1.  ACQUIRE LOCK         [harness]   flock or equivalent on the measurement primitive
-2.  RENDER STATE         [harness]   re-derive Head from Decision Log + git/file state
-3.  ENVIRONMENT CHECK    [harness]   emit fingerprint; abort if changed since last keep
-4.  SELECT TARGET        [harness]   lowest-density argmin over recent attempts
-5.  SELECT IDEA          [agent]     pick from queue; refill if empty
-6.  RUN FALSIFIER        [harness]   execute the idea's false_signal experiment first
-7.  IF FALSIFIED         [harness]   log discard_falsified, mark idea, goto 4
-8.  APPLY CHANGE         [agent]     smallest possible change matching the hypothesis
-9.  MEASURE              [tool]      the target type's measurement primitive
-10. RENDER VERDICT       [harness]   compute verdict from measurement + thresholds
-11. APPLY VERDICT        [harness]   commit/revert per the instance's revert protocol
-12. APPEND HISTORY       [harness]   archive iter snapshot, append Log entries, re-render Head
-13. RELEASE LOCK         [harness]
+
+```markdown
+Burn down findings emitted by `[source_of_truth_command]` without changing the command or its config.
 ```
 
-Steps 5 and 8 are the only places the agent operates. Everything else is mechanical. See [`references/loop-kernel.md`](references/loop-kernel.md).
+Bad:
 
-## What `scaffold` does
+```markdown
+Make this better.
+```
 
-When invoked, perform these steps in order. If anything is unclear, invoke `/vs-core-grill` to interview the user; do not guess.
+### Scope
 
-1. **Confirm `--kind` and `--instance`.** Validate slug is kebab-case and `.spec/<instance>/` does not already exist.
-2. **Run the scaffold-time grill.** Topics to resolve before writing files:
-   - The target unit (what is one item being iterated on?)
-   - The measurement primitive (what tool produces the verdict input?)
-   - The headline objective + sacred axes (optimization) OR the worklist source (coverage)
-   - The win condition (bar at scaffold time; escalation rule)
-   - The revert protocol (one of four — see [`references/revert-protocol-variants.md`](references/revert-protocol-variants.md))
-   - Whether human-in-loop lanes are needed
-   - The mechanism-class taxonomy (idea categories for the queue)
-3. **Calibrate the noise floor.** Run the measurement primitive K times under no-change conditions; record dispersion as the discard threshold for that target type. K defaults to 8; user can override.
-4. **Write the artifact tree** (full layout in [`references/directory-layout.md`](references/directory-layout.md)).
-5. **Render `MANDATES.md`** from the base mandates + the archetype overlay + grill answers.
-6. **Render `LOOP.md`** as the per-archetype 13-step playbook with concrete step contracts for this instance.
-7. **Initialize `falsifiers.md`** with the schema + the mechanism classes from the grill, each with a worked example falsifier.
-8. **Render `PROMPT.md`** as the paste-ready /loop input. The PROMPT instructs the agent to invoke `/vs-core-autoloop run --instance <slug>` each tick.
-9. **Print** the paste-ready invocation to the user, e.g.:
-   ```
-   /loop --budget 48h /vs-core-autoloop run --instance <slug>
-   ```
+List what may be changed. If unknown, require the loop to discover the smallest safe editable surface during setup and record it before the first iteration.
 
-## What `run` does each tick
+### Protected Surface
 
-When invoked by the execution driver:
+List what must not be changed. Always include evaluator, benchmark, parser, fixture, and data sources when present.
 
-1. Re-render STATE (rule 3 above; see [`references/state-rendering.md`](references/state-rendering.md)).
-2. Acquire the lock (see [`references/lock-and-fingerprint-protocol.md`](references/lock-and-fingerprint-protocol.md)).
-3. Check the environment fingerprint; if it has changed without a re-baseline, emit `discard_environment_changed` and stop the iter.
-4. Select target via lowest-density argmin (see [`references/lowest-density-target-selection.md`](references/lowest-density-target-selection.md)).
-5. Select idea: if the queue has at least one `pending` idea for the target, pick the highest-priority one. If empty, refill — either inline (read existing references; combine two near-misses; look at the runners-up in the scoreboard) or by invoking `/vs-core-research` if the gap is wide.
-6. Run the falsifier; emit `discard_falsified` if it fires.
-7. Apply the smallest change matching the hypothesis. Do not refactor adjacent code.
-8. Measure (call the target type's measurement primitive).
-9. Render verdict (see [`references/verdict-rendering.md`](references/verdict-rendering.md)).
-10. Apply verdict via the instance's revert protocol.
-11. Append history (results row, archive snapshot, lesson if non-trivial).
-12. Release lock.
-13. Return — the execution driver will invoke again on the next tick.
+Default protected-surface rule:
 
-The agent never decides the verdict; the renderer script does. The agent reads the latest `[kind=verdict]` entry in `mission.md`'s Decision Log at step 11 and acts accordingly.
+```markdown
+Do not edit the command/check that decides the verdict unless the explicit goal is to fix that command/check.
+```
 
-## Composition with sibling skills
+### Setup
 
-These are **opt-in**. Use them when they save time; iterate inline when dispatching is slower than doing the work directly.
+List files and commands the session must read before the first iteration. Keep this minimal and task-specific.
 
-| Sibling | When to invoke | Where in the loop |
-|---|---|---|
-| `vs-core-grill` | At scaffold time, to resolve open template slots | `scaffold` step 2 |
-| `vs-core-research` | When the idea queue is empty and the gap to the win condition is wide | `run` step 5 |
-| `vs-core-audit` | When stakes warrant adversarial review (a high-leverage `keep`, a sacred-axes-boundary change, a verdict that doesn't smell right) | After step 11, before lock release |
-| `vs-core-debug` | When a `crash` or `hang` verdict recurs and the cause is unclear | Out-of-band; pause the loop |
-| `/vs-core-profile-amd` (or other measurement-specific skill) | When the target type involves AMD CPU profiling | Inside the measurement primitive at step 9 |
+Examples:
 
-The skill never *requires* sibling invocation. The loop kernel works with inline reasoning at every step.
+- read `README.md`, the editable files, and the verdict command;
+- inspect existing result logs or previous failed attempts;
+- check git branch and working tree state;
+- verify required data or build artifacts exist.
 
-## Per-archetype recipes
+### Baseline
 
-- [Optimization archetype recipe](references/archetype-optimization.md) — quality-diversity grid, double selection, island reset, bar escalation.
-- [Coverage archetype recipe](references/archetype-coverage.md) — signature-bucketed worklist, named lanes, dedup-then-pick selection.
-- [Hybrid composition](references/archetype-coverage.md#hybrid-composition) — outer coverage + inner optimization stacking.
+Define how to establish the starting state before changing anything.
 
-## All references
+For numeric tasks, run the metric/check first and record the number.
 
-- [`loop-kernel.md`](references/loop-kernel.md) — 13-step sequence; per-step contracts.
-- [`harness-agent-split.md`](references/harness-agent-split.md) — author per artifact; rationale.
-- [`archetype-optimization.md`](references/archetype-optimization.md) — quality-diversity grid recipe.
-- [`archetype-coverage.md`](references/archetype-coverage.md) — bucketed worklist + lanes recipe.
-- [`directory-layout.md`](references/directory-layout.md) — `.spec/<instance>/` skeleton + git-tracking rule.
-- [`verdict-rendering.md`](references/verdict-rendering.md) — 8-value enum + renderer-script contract.
-- [`falsifier-registry-schema.md`](references/falsifier-registry-schema.md) — three-criteria template; YAML frontmatter.
-- [`lock-and-fingerprint-protocol.md`](references/lock-and-fingerprint-protocol.md) — locking primitive + environment-fingerprint schema.
-- [`noise-floor-calibration.md`](references/noise-floor-calibration.md) — calibration protocol; per-primitive examples.
-- [`lowest-density-target-selection.md`](references/lowest-density-target-selection.md) — argmin algorithm + bar escalation.
-- [`state-rendering.md`](references/state-rendering.md) — render-don't-append rule + renderer skeleton.
-- [`revert-protocol-variants.md`](references/revert-protocol-variants.md) — four protocols; hook signatures.
-- [`human-in-loop-lanes.md`](references/human-in-loop-lanes.md) — queue-lane pattern; defer-vs-skip.
-- [`cli-and-execution.md`](references/cli-and-execution.md) — `scaffold` and `run` command details; budget; `/loop` integration.
-- [`case-studies/`](references/case-studies/) — worked examples per target type (read for instantiation patterns; not part of the skill body).
+For coverage/worklist tasks, run the discovery command and record the pending items.
+
+For qualitative tasks, define the scenario checklist, smoke test, telemetry, or human-review rule that will decide whether a change is keepable.
+
+### Ledger
+
+Define a simple append-only log. Use a table unless the task already has a better local format.
+
+Default columns:
+
+```text
+iteration	target	change	verdict	result	status	notes
+```
+
+For git-backed code loops, include the commit hash for kept work.
+
+For crashes, record `result=0` or `result=crash` and include the short failure reason.
+
+### Iteration
+
+Each iteration must:
+
+1. Check the current branch and working tree state.
+2. Pick exactly one target.
+3. Pick exactly one idea.
+4. Apply the smallest change that tests the idea.
+5. Run the verdict command/check with output redirected to a log file when noisy.
+6. Parse the result with the declared parser/rule.
+7. Keep, discard, or mark crash according to the verdict section.
+8. Append the ledger.
+9. Continue to the next iteration unless a pause gate fires.
+
+Do not bundle unrelated ideas into one iteration.
+
+### Verdict
+
+Define the exact keep/discard rule.
+
+Numeric examples:
+
+```markdown
+Keep only if the primary metric improves by more than the declared noise floor and protected checks do not regress.
+```
+
+```markdown
+Discard if the result is equal, worse, below the noise floor, or if any protected check fails.
+```
+
+Coverage examples:
+
+```markdown
+Keep if the active item is no longer emitted by the source-of-truth command and tests pass.
+```
+
+```markdown
+Discard if the active item remains, a different item regresses, or the source-of-truth command cannot run.
+```
+
+Qualitative examples:
+
+```markdown
+Keep only if the scenario checklist passes and any required human-review lane is satisfied.
+```
+
+The model may summarize evidence, but it must not self-certify success when a command, parser, done-check, or human-review lane is the authority.
+
+### Keep / Discard / Crash
+
+Define the local lifecycle before the loop starts.
+
+Default git-backed policy:
+
+- Start each iteration from a clean working tree.
+- If the change is kept, commit only the intended files with a short message.
+- If the change is discarded or crashes before commit, restore only the attempted change.
+- Never use destructive git commands that can remove unrelated user work.
+- Never push, merge, deploy, or rewrite history.
+
+If the repo already has uncommitted user changes, the loop must avoid touching them unless they are in the declared editable surface and required for the goal.
+
+### Idea Refill
+
+When out of ideas, refill from local evidence first:
+
+- previous rejects and near-misses;
+- profiler or test output;
+- failing item clusters;
+- source code patterns;
+- official docs or papers explicitly relevant to the target;
+- simple combinations of prior useful changes.
+
+The loop may use additional research only when local evidence is insufficient. Research output must become concrete queued ideas with a target, expected signal, verification check, and discard condition. Do not make research a mandatory per-iteration step.
+
+### Pause Gates
+
+The loop must pause, not improvise, when:
+
+- the verdict command/check is missing or unreliable;
+- the protected surface must be edited to proceed;
+- the next step would push, merge, deploy, spend money, use credentials, delete data, or mutate external/production state;
+- repeated crashes show the current strategy is broken;
+- the baseline changes for environmental reasons;
+- the working tree contains unrelated user edits that block a safe discard;
+- the task becomes ambiguous enough that a wrong decision could waste many iterations.
+
+Do not ask the human after every iteration. Ask only when a pause gate fires or a required material slot is missing.
+
+### Resume
+
+Define how a fresh session resumes:
+
+1. Read this loop prompt/runbook.
+2. Read the ledger.
+3. Check git status and current branch.
+4. Re-run or verify the current baseline if needed.
+5. Continue from the next unblocked target.
+
+Chat history is not source of truth. The ledger, files, commands, and git state are.
+
+### Anti-Cheat
+
+Always include:
+
+- Do not edit evaluator, benchmark, parser, fixture, source-of-truth data, or protected checks unless explicitly authorized.
+- Do not hardcode hidden cases or benchmark identifiers.
+- Do not weaken tests or delete failing cases to create a keep.
+- Do not make competitor/reference behavior worse.
+- Do not report a keep from narrative confidence; use the declared verdict source.
+- Do not hide crashes, hangs, or worse results.
+
+## Task Adapters
+
+Use these as lightweight patterns. Do not print the adapter name unless it helps the prompt.
+
+### Numeric Optimization
+
+Use for performance, latency, loss, eval score, memory, cost, throughput, or ELO.
+
+Required additions:
+
+- primary metric and direction;
+- baseline command;
+- parser;
+- noise floor or repeat policy;
+- secondary/protected checks;
+- keep threshold.
+
+### Coverage / Worklist
+
+Use for compiler dialect coverage, lint/type burndown, docs gaps, TODOs, dependency upgrades, alerts, security findings, or bug queues.
+
+Required additions:
+
+- source-of-truth discovery command;
+- item identity/signature;
+- done-check;
+- priority rule;
+- blocked/repeated-failure rule.
+
+### Reference / Parity
+
+Use for competitor/reference implementation parity, conformance, golden outputs, or compatibility.
+
+Required additions:
+
+- reference source;
+- equivalence rule;
+- allowed tolerance;
+- regression guard for already-passing cases.
+
+### Stability First
+
+Use when crashes, flakes, hangs, variance, or correctness failures matter more than headline speed.
+
+Required additions:
+
+- stability metric or failure source;
+- repeated-run policy;
+- fail-fast checks;
+- rule that performance work starts only after stability gates pass.
+
+### Qualitative / Playability
+
+Use for game playability, UI feel, writing quality, or other partially subjective work.
+
+Required additions:
+
+- scenario checklist;
+- smoke test or telemetry when possible;
+- human-review lane when subjective judgment is required;
+- no autonomous keep when the declared authority is human review.
+
+## Falsifier Policy
+
+Falsifiers are useful, but not every task has a meaningful pre-change falsifier.
+
+Pick one:
+
+- **Independent falsifier:** a cheap check that disproves the idea before a full run.
+- **Post-change done-check:** the normal verification proves whether the change worked.
+- **Logical check:** a static or local check makes the hypothesis impossible.
+- **No cheap falsifier:** record that fact and require stronger verification or human review.
+
+Do not invent fake falsifiers just to satisfy a template.
+
+## Output Rules
+
+- Output one artifact only.
+- Do not generate multiple variants.
+- Do not require a special loop command or script.
+- Do not prescribe delegation.
+- Do not hardcode language, repo, benchmark, package manager, metric name, or result filename unless the user provided it.
+- Use simple markdown that can be pasted directly into a coding assistant.
+- Keep the artifact specific enough that a session can start work immediately.
+
+## Template
+
+Use this template and fill it with the user's task details:
+
+````markdown
+# autoloop
+
+## Goal
+[objective and success condition]
+
+## Scope
+- Editable:
+  - [paths or surfaces]
+- Out of scope:
+  - [what not to touch]
+
+## Protected Surface
+- [evaluators, commands, fixtures, data, credentials, external systems]
+
+## Setup
+1. [read/check command or file]
+2. [read/check command or file]
+3. Confirm branch and working tree state.
+
+## Baseline
+- Command/check: `[command]`
+- Parser/rule: `[how to read result]`
+- Baseline record: append the initial result to the ledger before editing.
+
+## Ledger
+Append one row after every iteration:
+
+```text
+iteration	target	change	verdict	result	status	notes
+```
+
+## Iteration
+Repeat until interrupted or until a pause gate fires:
+
+1. Check branch and working tree state.
+2. Pick one target.
+3. Pick one idea.
+4. Apply the smallest change that tests the idea.
+5. Run `[command/check]`, redirecting noisy output to `[log path]`.
+6. Parse the result with `[parser/rule]`.
+7. Decide keep/discard/crash using the Verdict section.
+8. Apply the Keep / Discard / Crash section.
+9. Append the ledger.
+10. Continue to the next iteration.
+
+## Verdict
+- Keep if: [exact condition]
+- Discard if: [exact condition]
+- Crash/hang if: [exact condition]
+- Protected checks: [must pass]
+
+## Keep / Discard / Crash
+- Keep: [commit/save policy]
+- Discard: [restore policy]
+- Crash/hang: [log and restore policy]
+
+## Idea Refill
+If no useful idea remains, refill from:
+- ledger rejects and near-misses;
+- profiler/test/log output;
+- source code patterns;
+- relevant docs;
+- small combinations of prior useful changes.
+
+## Pause Gates
+Pause and ask only if:
+- [task-specific gate]
+- protected surface must be edited;
+- external/production/destructive action is needed;
+- repeated crashes block progress;
+- safe rollback is not possible.
+
+## Resume
+On a fresh session:
+1. Read this file.
+2. Read the ledger.
+3. Check branch and working tree state.
+4. Verify or rerun the baseline if needed.
+5. Continue from the next unblocked target.
+
+## Anti-Cheat
+- Do not edit protected evaluator/check files.
+- Do not hardcode hidden cases or benchmark identifiers.
+- Do not weaken tests or remove failing cases to create a keep.
+- Do not report keep from confidence; use the verdict source.
+- Do not hide crashes, hangs, or regressions.
+````
