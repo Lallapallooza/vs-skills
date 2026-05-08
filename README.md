@@ -1,6 +1,6 @@
 # AI Agent Skills
 
-12 modular skills for AI coding agents. Eight run as coordinator-plus-parallel-sub-agents with adversarial critical merge; two manage standing behavioral state and the project's CLAUDE.md lifecycle; one is a tool-mechanics operator's guide for AMD CPU profiling; one scaffolds and operates long-running autonomous iteration loops on top of the orchestration tier. Platform-agnostic -- works with Claude Code, Codex, OpenCode, or any agent that supports sub-agent dispatch and file-based skill discovery.
+13 modular skills for AI coding agents. Eight run as coordinator-plus-parallel-sub-agents with adversarial critical merge; two manage standing behavioral state and the project's CLAUDE.md lifecycle; two are tool-mechanics operator's guides (one for AMD CPU profiling on Zen, one for NVIDIA GPU profiling Pascal-Blackwell); one scaffolds and operates long-running autonomous iteration loops on top of the orchestration tier. Platform-agnostic -- works with Claude Code, Codex, OpenCode, or any agent that supports sub-agent dispatch and file-based skill discovery.
 
 ## Installation
 
@@ -45,6 +45,7 @@ Model tiers (`strongest`, `strong`, `fast`) are generic; map them to your platfo
 | `/vs-core-debug` | Bug with unknown root cause | Root-cause diagnosis + fix + regression test |
 | `/vs-core-tropes` | Check text for AI writing patterns | Findings with concrete rewrites |
 | `/vs-core-profile-amd` | Profile or microarch-analyze native code on AMD Zen | Tool-mechanics playbook (uProf / perf / IBS / likwid / bpftrace) with Zen-generation-aware recipes |
+| `/vs-core-profile-nvidia` | Profile or microarch-analyze CUDA / ML / LLM workloads on NVIDIA GPUs | Tool-mechanics playbook (Nsight Systems / Nsight Compute / PC Sampling / PyTorch profiler / DCGM / Meta HTA / Perfetto) with arch-aware (Pascal-Blackwell) and CUDA-toolkit-version-pinned recipes |
 | `/vs-core-interactive` | Want a standing behavioral layer for a conversational session | Loaded principles, interaction style, verification iron law, banned hedges; optional session log |
 | `/vs-core-init` | Create or extend a project's CLAUDE.md | Root `CLAUDE.md` (init mode) or a targeted appended section (append mode) |
 | `/vs-core-autoloop` | Set up a long-running autonomous iteration loop (perf tuning, eval-set tuning, lint or fuzz burndown, ELO tuning, cost reduction, etc.) | Scaffolded `.spec/<instance>/` (mission.md per the orchestration tier + queue + archive + paste-ready /loop prompt) |
@@ -66,7 +67,7 @@ Not every task needs every step. A small bug fix: `/vs-core-debug`. A quick feat
 
 ## Architecture
 
-**Atomic skills** (standalone, single-purpose): `/vs-core-grill`, `/vs-core-research`, `/vs-core-arch`, `/vs-core-audit`, `/vs-core-debug`, `/vs-core-tropes`, `/vs-core-profile-amd`.
+**Atomic skills** (standalone, single-purpose): `/vs-core-grill`, `/vs-core-research`, `/vs-core-arch`, `/vs-core-audit`, `/vs-core-debug`, `/vs-core-tropes`, `/vs-core-profile-amd`, `/vs-core-profile-nvidia`.
 
 **Pipeline skills** (call other skills): `/vs-core-rfc` (invokes grill + research patterns), `/vs-core-implement` (invokes tropes and audit as gates).
 
@@ -130,6 +131,9 @@ Scans prose for AI writing patterns (em-dash addiction, negative parallelism, ma
 
 ### `/vs-core-profile-amd`
 Operator's guide for profiling native code (C/C++/Rust/Go) on AMD Zen 2/3/4/5 hardware. Reference-heavy: 6 references covering Zen-generation matrix, top-down microarch (TMA), Instruction-Based Sampling (IBS Op / IBS Fetch), uProf install troubleshooting, perf/samply/likwid/bpftrace complements, and Zen-event-group recipes. AMD-specific microarch questions (TMA on Zen 4+, IBS Op with `L3MissOnly`/`LdLat` filters, per-UMC memory bandwidth, roofline) → uProf; everything else (cgroup-scoped profiles, off-CPU, false sharing via `perf c2c`, sharing profiles) → perf/samply/bpftrace. The skill body teaches when to reach for which tool given the question's specialization. No sub-agent dispatch.
+
+### `/vs-core-profile-nvidia`
+Operator's guide for profiling CUDA kernels, ML training, and LLM inference on NVIDIA GPUs (Pascal/Volta/Turing/Ampere/Ada/Hopper/Blackwell). Reference-heavy: 7 references covering Nsight Systems CLI recipes, Nsight Compute CLI recipes (sections + replay modes + FA/NCCL workarounds), PC Sampling mechanics (precision contract + 18-stall-reason taxonomy + Activity-API vs continuous-mode), NVIDIA architecture matrix (Pascal-Blackwell with the H100 PCIe-vs-SXM5 trap and H800 export-restricted variant flagged), Roofline + MFU methodology (per-arch dense FLOPs and HBM bandwidth, ridge-point AI, wave quantization detection, Llama 3 / DeepSeek-V3 worked examples), install/permissions/MIG/MPS/cloud/container troubleshooting, and ecosystem complements (PyTorch profiler / Kineto, NVTX, DCGM + DCGM-Exporter, Meta's Holistic Trace Analysis, Perfetto, cudaEvent timing, Triton profile hooks). Core principle: **nsys before ncu, system-level before kernel-level**; ncu kernel-replay distorts overlap by 3-4× on FA3/NCCL/CUTLASS Ping-Pong as a measurement-overhead side effect, so cross-stream timing claims must come from `nsys` + `cudaEvent`, not `ncu` wall-clock. Companion to `gpu-ml-judgment.md` (judgment) — this skill is the tool mechanics. No sub-agent dispatch.
 
 ### `/vs-core-interactive`
 Standing behavioral layer for conversational sessions. Loads four core principles (Think Before Coding, Simplicity First, Surgical Changes, Goal-Driven Execution), an interaction-style block (direct, no sycophancy, brutal honesty over sugar-coating), a verification iron law ("no completion claims without fresh verification evidence"), and a banned-hedge-phrases list. Auto-loads `trust-boundary.md`, `rationalization-rejection.md`, `self-critique-suffix.md` from shared, plus language judgment files matching detected domain signals. Suggests structured pipeline skills when the task matches their scope. Optionally writes multi-artifact session logs to `.spec/{slug}/interactive-{session-slug}.md` at natural stopping points.

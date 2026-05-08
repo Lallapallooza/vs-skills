@@ -181,6 +181,7 @@ Stop and surface the problem to the user when:
 ## Related skills / files
 
 - `vs-core-_shared/prompts/language-specific/perf-judgment.md` — general performance-engineering judgment (TMA concept, false sharing, TLB ceiling, algorithmic choices, etc.). This skill is the *tool* companion to that *judgment*.
+- `vs-core-profile-nvidia` — sister skill for NVIDIA GPU profiling (Nsight Systems / Nsight Compute / PC Sampling / PyTorch profiler / DCGM / Meta HTA, Pascal-Blackwell). Use it when the workload runs on GPU; use this skill when the bottleneck is in CPU code (including native libraries called from Python — NumPy, PyTorch C++ kernels, etc.).
 - `vs-core-debug` — when performance problem is a reproducible bug; use debug's reproduce/hypothesize/discriminate flow, invoke this skill for the profiling steps.
 - `vs-core-research` — when you need deep technical research beyond what these references cover (e.g., a specific hardware erratum or a new kernel feature).
 - `vs-core-implement` — when the profiling feeds into a multi-file optimization implementation.
