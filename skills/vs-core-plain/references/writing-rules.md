@@ -131,3 +131,31 @@ Where the text carries a hazard or a destructive action, put the command or the 
 Start each sentence with something the reader already has. End with what is new. The new thing becomes the given thing for the next sentence. This chains.
 
 When a sentence must open with an unfamiliar term, define it in that sentence or move it later. See `evidence-base.md` §2 -- ordering outranks length. If you can only fix one thing, fix the order.
+
+## 10. Code Comments
+
+Decide whether the comment should exist before you touch its wording.
+
+**Keep a comment only if it states one of these:**
+- an invariant, or a precondition the type system does not enforce;
+- a safety condition (`SAFETY:`);
+- a reason that is not visible in the code: why this approach, why this constant;
+- the derivation of a constant, or a units or layout contract.
+
+**Delete it when it:**
+- restates the code: "Returns the foo" on `fn foo()`, "loop over the layers" above the loop;
+- lists what the code already defines, such as supported ops, dtypes, callers, users, flags or files ("supported by X, Y and Z", "used by A and B", "see also ..."). These lists go stale the first time the code changes;
+- tells history: "now", "previously", "no longer", "new", "legacy", "used to", "instead of the old X".
+
+**Match the siblings.** Read the neighbouring variants, fields, methods or arms. Do not document one member when its siblings have no comments. When the name already says it, delete the lone comment. Add comments to the siblings only when every sibling needs one, and then use the same length and form for all of them.
+
+**Match the density of the file.** New code in a sparsely commented file stays sparse.
+
+**Put a fact where it is true.** A behaviour of one operation belongs next to the code that implements it, not on a type that many operations share.
+
+## 11. Docs That Rot
+
+- **Link, do not copy.** Do not paste CLI flag lists, struct field lists, op-support tables or long file lists. Link to `--help` output or to the source file. Copies drift the first time the code changes.
+- **Keep tables that are the contract.** A table that defines a format or a naming scheme is the spec, not a copy. Keep it.
+- **Keep parallel sections parallel.** Across a set of docs, give every model, backend or command section the same structure and the same terms. A reader who learns one section should be able to read the next.
+

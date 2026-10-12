@@ -24,7 +24,8 @@ The register decides which rules apply. Choosing wrong is the most common failur
 | Mode | Use for | Rules |
 |---|---|---|
 | **Strict** | Procedures, CLI help, error messages, tool descriptions, safety text, API docs | All rules. 20-word limit. Imperative. No exceptions without saying so. |
-| **Prose** | Issue comments, maintainer threads, RFCs, READMEs, design docs | Structural rules only: 25-word limit, active voice, one word one meaning, no hedges. Keep the grammar needed to concede, disagree, and ask. |
+| **Prose** | Issue comments, maintainer threads, RFCs, READMEs, design docs | Structural rules only: 25-word limit, active voice, one word one meaning, no hedges. Keep the grammar needed to concede, disagree, and ask. For docs, also §11 (docs that rot). |
+| **Code comments** | Code comments, doc comments, docstrings | §10 first: decide whether the comment should exist and whether it matches its siblings. Only then apply the strict wording rules to what is left. |
 
 STE was built for maintenance manuals: one actor, procedures, no argument. A discussion post needs to say "I disagree, but you are right about X", and STE has no grammar for that. Applying strict mode to a debate produces text that is simple and useless.
 
@@ -34,17 +35,18 @@ STE was built for maintenance manuals: one actor, procedures, no argument. A dis
 
 1. Read the target text, or the request if writing from scratch.
 2. Identify the audience and pick the mode. State which mode you chose.
-3. Apply `references/writing-rules.md`, in this order:
+3. For code comments and docs, first apply `references/writing-rules.md` §10 or §11: delete what should not exist, and make siblings consistent. Wording comes after.
+4. Apply `references/writing-rules.md`, in this order:
    - **Order first.** Fix given-new flow before anything else. It outranks length.
    - **Cut hedges and padding.** Highest yield, shortens and strengthens together.
    - **Promote buried verbs.** Usually fixes length and missing actors at once.
    - **Then split long sentences**, if they are still long.
-4. **Mandatory:** run the checker.
+5. **Mandatory:** run the checker.
    ```bash
    bash <skill-dir>/check-plain.sh <target-path>
    ```
-5. Triage every flag. Fix it, or record it as a false positive with the reason. The checker is dumb by design.
-6. If the text is public-facing, run `vs-core-tropes`.
+6. Triage every flag. Fix it, or record it as a false positive with the reason. The checker is dumb by design.
+7. If the text is public-facing, run `vs-core-tropes`.
 
 ## Output
 
@@ -76,6 +78,8 @@ These are the ways this skill goes wrong. Check yourself against them before ret
 **Optimising the metric.** Word counts predict only 23-34% of variance in real reading ease. "Mike eats your cat gun now!" passes every formula. Splitting a sentence to get under 25 words, at the cost of the given-new chain, makes the text worse while improving the score. See `evidence-base.md` §8.
 
 **Deleting meaning to hit a rule.** The single unacceptable failure. If a claim is uncertain, say so in plain words. Removing a genuine qualification is a change of meaning, not a simplification.
+
+**Polishing text that should not exist.** Rewording a comment that restates the code, lists what the code already defines, or is the only documented item among bare siblings. A clearer version of a bad comment is still a bad comment. Decide existence and consistency before wording.
 
 **Flattening register.** Prose that concedes, disagrees, or asks needs grammar that strict mode forbids. Simple is not the same as blunt, and a maintainer thread is not a manual.
 
